@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="km">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ប្រព័ន្ធទាក់ទង ICOM - Voice Only</title>
+    <!-- ភ្ជាប់ទៅកាន់ឯកសារ CSS -->
+    <link rel="stylesheet" href="coco.css">
+    <!-- Socket.io Client SDK -->
+    <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h2>📻 ICOM Walkie-Talkie</h2>
+        <span id="status" class="status-badge">មិនទាន់ភ្ជាប់</span>
+    </div>
+
+    <!-- ១. ទម្រង់បង្កើត ឬ ចូលគ្រុប -->
+    <div id="loginForm" class="form-group">
+        <input type="text" id="groupName" placeholder="ឈ្មោះគ្រុប (Group Name)" autocomplete="off" required>
+        <input type="password" id="groupPass" placeholder="ពាក្យសម្ងាត់ (Password)" required>
+        <button class="btn" onclick="joinGroup()">ចូលរួម ឬ បង្កើតគ្រុប</button>
+    </div>
+
+    <!-- ២. ផ្ទាំងចុចនិយាយ (ICOM Interface) -->
+    <div id="icomInterface" class="icom-interface">
+        <div class="group-info">
+            <span style="font-size: 0.85rem; color: var(--sub-text);">គ្រុបបច្ចុប្បន្ន</span>
+            <h3 id="activeGroupName">-</h3>
+            <span id="onlineCount" style="font-size: 0.8rem; color: var(--accent);">សមាជិក online: 1</span>
+        </div>
+
+        <button id="pttBtn" class="ptt-button">
+            <span>🎙️</span>
+            <span>ចុចឱ្យជាប់<br>ដើម្បីនិយាយ</span>
+        </button>
+
+        <div class="ptt-hint">
+            💡 <b>ទិចនិក៖</b> អ្នកអាចចុចប៊ូតុង <b>Play/Pause លើកាសខ្សែ</b> ឱ្យជាប់ ឬចុច Spacebar ដើម្បីនិយាយបាន!
+        </div>
+
+        <button class="btn btn-secondary" onclick="leaveGroup()">ចាកចេញពីគ្រុប</button>
+    </div>
+</div>
+
+<script>
+    const socket = io();
+    let mediaRecorder = null;
+    let localStream = null;
+    let isSpeaking = false;
+
+    // ១. មុខងារចូលគ្រុប (ស្នើសុំសិទ្ធិត្រឹមតែ Audio ប៉ុណ្ណោះ គ្មាន Camera)
+    async function joinGroup() {
+        const groupName = document.getElementById('groupName').value.trim();
+        const password = document.getElementById('groupPass').value.trim();
+
+        if (!groupName || !password) {
+            alert('សូមបញ្ចូលឈ្មោះគ្រុប និងពាក្យសម្ងាត់!');
+            return;
+        }
+
+        try {
+            // ស្នើសុំសិទ្ធិត្រឹមតែ Audio / Microphone ប៉ុណ្ណោះ (គ្មាន video/camera ទេ)
+            localStream = await navigator.mediaDevices.getUserMedia({ 
+                audio: {
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl: true
+                }, 
+                video: false 
+            });
+
+            // ផ្ញើឈ្មោះគ្រុប និងលេខកូដទៅ Server ផ្ទៀងផ្ទាត់
+            socket.emit('join-group', { groupName, password }, (res) => {
+                if (res.success) {
+                    document.getElementById('loginForm').style.display = 'none';
+                    document.getElementById('icomInterface').style.display = 'flex';
+                    document.getElementById('activeGroupName').innerText = groupName;
+                    
+                    updateStatus('បានភ្ជាប់ - រង់ចាំនិយាយ', true);
+                    setupMediaRecorder();
+                    setupMediaSession();
+                } else {
+                    alert(res.message);
+                }
+            });
+
+        } catch (err) {
+            alert('មិនអាចបើក មេក្រូហ្វូន បានទេ! សូមពិនិត្យមើលថាតើអ្នកបានផ្តល់សិទ្ធិប្រើប្រាស់ Microphone ឬនៅ។');
+            console.error(err);
+        }
+    }
+
+    // ២. រៀបចំ MediaRecorder សម្រាប់ Stream សំឡេង
+    function setupMediaRecorder() {
+        if (!localStream) return;
+        
+        mediaRecorder = new MediaRecorder(localStream);
+
+        mediaRecorder.ondataavailable = (e) => {
+            if (e.data.size > 0 && isSpeaking) {
+                socket.emit('audio-stream', e.data);
+            }
+        };
+    }
+
+    // ៣. ចាប់យកសំឡេងពីសមាជិកផ្សេងទៀតដែលនៅក្នុងគ្រុបតែមួយ
+    socket.on('receive-audio', (data) => {
+        const blob = new Blob([data.audioData], { type: 'audio/webm' });
+        const audioUrl = URL.createObjectURL(blob);
+        const audio = new Audio(audioUrl);
+        audio.play().catch(e => console.log('Audio playback error:', e));
+    });
+
+    socket.on('user-joined', (data) => {
+        document.getElementById('onlineCount').innerText = `សមាជិក online: ${data.totalUsers}`;
+    });
+
+    socket.on('user-left', (data) => {
+        document.getElementById('onlineCount').innerText = `សមាជិក online: ${data.totalUsers}`;
+    });
+
+    // ៤. បើក/បិទ ការនិយាយ (Push To Talk - PTT)
+    function setMicState(active) {
+        if (!mediaRecorder) return;
+
+        isSpeaking = active;
+        const pttBtn = document.getElementById('pttBtn');
+
+        if (active) {
+            if (mediaRecorder.state === 'inactive') {
+                mediaRecorder.start(100); // ផ្ញើ Slice សំឡេងរៀងរាល់ 100ms
+            }
+            pttBtn.classList.add('speaking');
+            updateStatus('🎙️ កំពុងនិយាយ...', true);
+        } else {
+            if (mediaRecorder.state === 'recording') {
+                mediaRecorder.stop();
+            }
+            pttBtn.classList.remove('speaking');
+            updateStatus('បានភ្ជាប់ - រង់ចាំនិយាយ', true);
+        }
+    }
+
+    function updateStatus(text, isConnected) {
+        const badge = document.getElementById('status');
+        badge.innerText = text;
+        if (isConnected) badge.classList.add('connected');
+        else badge.classList.remove('connected');
+    }
+
+    // ៥. Events ចាប់លើការចុច/លែង PTT Button
+    const pttBtn = document.getElementById('pttBtn');
+
+    pttBtn.addEventListener('mousedown', () => setMicState(true));
+    pttBtn.addEventListener('mouseup', () => setMicState(false));
+
+    pttBtn.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        setMicState(true);
+    });
+    pttBtn.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        setMicState(false);
+    });
+
+    // ៦. ចាប់សញ្ញាប៊ូតុងកាស និង Spacebar
+    function setupMediaSession() {
+        if ('mediaSession' in navigator) {
+            navigator.mediaSession.setActionHandler('play', () => setMicState(true));
+            navigator.mediaSession.setActionHandler('pause', () => setMicState(false));
+        }
+
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' && !e.repeat && document.activeElement.tagName !== 'INPUT') {
+                setMicState(true);
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            if (e.code === 'Space' && document.activeElement.tagName !== 'INPUT') {
+                setMicState(false);
+            }
+        });
+    }
+
+    // ៧. ចាកចេញពីគ្រុប
+    function leaveGroup() {
+        location.reload();
+    }
+</script>
+
+</body>
+</html>

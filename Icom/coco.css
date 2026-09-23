@@ -1,0 +1,156 @@
+:root {
+    --bg-color: #1a1a24;
+    --card-bg: #262636;
+    --primary: #ff4757;
+    --primary-active: #ff6b81;
+    --text: #ffffff;
+    --sub-text: #a4b0be;
+    --accent: #2ed573;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: 'Kantumruy Pro', system-ui, -apple-system, sans-serif;
+}
+
+body {
+    background-color: var(--bg-color);
+    color: var(--text);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    padding: 20px;
+}
+
+.container {
+    width: 100%;
+    max-width: 400px;
+    background: var(--card-bg);
+    border-radius: 24px;
+    padding: 24px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.header {
+    text-align: center;
+}
+
+.header h2 {
+    font-size: 1.5rem;
+    color: var(--text);
+    margin-bottom: 4px;
+}
+
+.status-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    background: #3a3a50;
+    color: var(--sub-text);
+}
+
+.status-badge.connected {
+    background: rgba(46, 213, 115, 0.2);
+    color: var(--accent);
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+input {
+    width: 100%;
+    padding: 14px 16px;
+    border-radius: 12px;
+    border: 2px solid #3a3a50;
+    background: #1e1e2d;
+    color: var(--text);
+    font-size: 1rem;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+input:focus {
+    border-color: var(--primary);
+}
+
+.btn {
+    width: 100%;
+    padding: 14px;
+    border: none;
+    border-radius: 12px;
+    background: var(--primary);
+    color: white;
+    font-size: 1rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.btn:hover {
+    background: var(--primary-active);
+}
+
+.btn-secondary {
+    background: #3a3a50;
+}
+
+.icom-interface {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+}
+
+.group-info {
+    text-align: center;
+}
+
+.group-info h3 {
+    font-size: 1.8rem;
+    color: var(--accent);
+    margin-top: 2px;
+}
+
+.ptt-button {
+    width: 180px;
+    height: 180px;
+    border-radius: 50%;
+    border: none;
+    background: radial-gradient(circle, #ff4757 0%, #c0392b 100%);
+    color: white;
+    font-size: 1.2rem;
+    font-weight: bold;
+    cursor: pointer;
+    box-shadow: 0 10px 30px rgba(255, 71, 87, 0.4);
+    user-select: none;
+    -webkit-touch-callout: none;
+    transition: transform 0.1s, box-shadow 0.1s;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+}
+
+.ptt-button:active, .ptt-button.speaking {
+    transform: scale(0.95);
+    background: radial-gradient(circle, #2ed573 0%, #27ae60 100%);
+    box-shadow: 0 10px 30px rgba(46, 213, 115, 0.6);
+}
+
+.ptt-hint {
+    font-size: 0.8rem;
+    color: var(--sub-text);
+    text-align: center;
+    line-height: 1.4;
+}
